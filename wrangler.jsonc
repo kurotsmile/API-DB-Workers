@@ -1,0 +1,12 @@
+{
+  "name": "json-worker",
+  "main": "src/index.js",
+  "compatibility_date": "2025-10-18",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "carrot",
+      "database_id": "e42e682f-5c2d-422a-93df-3fbd5ff3d2ef"
+    }
+  ]
+}
