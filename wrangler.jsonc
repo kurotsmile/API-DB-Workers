@@ -8,5 +8,11 @@
       "database_name": "carrot",
       "database_id": "e42e682f-5c2d-422a-93df-3fbd5ff3d2ef"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MY_BUCKET",
+      "bucket_name": "carrotstore"
+    }
   ]
 }
