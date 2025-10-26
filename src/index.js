@@ -3,6 +3,7 @@ import { handleUserRequest } from './user.js';
 import { handleUploadFile, handleGetFile } from './fileR2.js';
 import { handleOrdersRequest } from './orders.js';
 import { handleContactsRequest } from './contacts.js';
+import { handleReportsRequest } from './reports.js';
 
 export default {
 	async fetch(request, env) {
@@ -23,8 +24,8 @@ export default {
 
 		// ✅ Router chính
 		switch (true) {
-			case pathname.startsWith('/song'):
-			case pathname.startsWith('/get_song'):
+			case pathname	===	'/song':
+			case pathname	===	'/get_song':
 			case pathname.startsWith('/song_random'):
 			case pathname.startsWith('/list_song'):
 			case pathname.startsWith('/add_song'):
@@ -32,10 +33,13 @@ export default {
 			case pathname.startsWith('/search_song'):
 				return handleSongRequest(request, env, corsHeaders);
 
-			case pathname.startsWith('/user'):
-			case pathname === '/users':
-			case pathname.startsWith('/get_user'):
-			case pathname.startsWith('/search_user'):
+			case pathname ==='/users':
+			case pathname ==='/get_user':
+			case pathname ==='/search_user':
+			case pathname ==='/login':
+			case pathname ==='/register':
+			case pathname ==='/get_password':
+			case pathname ==='/update_user':
 				return handleUserRequest(request, env, corsHeaders);
 
 			case pathname === '/upload_file' && request.method === 'POST':
@@ -52,6 +56,9 @@ export default {
 			case pathname.startsWith('/add_contact'):
 			case pathname.startsWith('/delete_contact'):
 				return handleContactsRequest(request, env, corsHeaders);
+
+			case pathname.startsWith('/add_report'):
+				return handleReportsRequest(request, env, corsHeaders);
 
 			default:
 				return new Response(

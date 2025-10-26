@@ -3,6 +3,93 @@ export async function handleUserRequest(request, env, corsHeaders) {
 	const path = url.pathname;
 
 	try {
+		// Đăng ký tài khoản
+		if (path === '/register' && request.method === 'POST') {
+			const body = await request.json();
+			const { name, email, password, phone, lang = 'en' } = body;
+
+			if (!email || !password) {
+				return new Response(JSON.stringify({ error: 'Missing email or password' }), { status: 400, headers: corsHeaders });
+			}
+
+			// Kiểm tra trùng email
+			const checkUser = await env.DB.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1').bind(email).all();
+			if (checkUser.results.length > 0) {
+				return new Response(JSON.stringify({ error: 'Email already registered' }), { status: 400, headers: corsHeaders });
+			}
+
+			// Hash mật khẩu (SHA-256)
+			//const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+			//const hashPassword = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+			const createdAt = new Date().toISOString();
+			const role = 'user';
+			const type = 'basic';
+
+			await env.DB.prepare(`
+				INSERT INTO users (name, email, password, phone, lang, created_at, role, type)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`).bind(name || '', email.trim().toLowerCase(), password, phone || '', lang, createdAt, role, type).run();
+
+			return new Response(JSON.stringify({ success: true, message: 'User registered successfully' }), { headers: corsHeaders });
+		}
+
+		// Đăng nhập
+		if (path === '/login' && request.method === 'POST') {
+			const body = await request.json();
+			const { email, password } = body;
+
+			if (!email || !password) {
+				return new Response(JSON.stringify({ error: 'Missing email or password' }), { status: 400, headers: corsHeaders });
+			}
+
+			//const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+			//const hashPassword = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+			const { results } = await env.DB.prepare('SELECT id, name, email, avatar,address,phone,sex,type,role, lang FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1')
+				.bind(email, password)
+				.all();
+
+			if (results.length === 0) {
+				return new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401, headers: corsHeaders });
+			}
+
+			const user = results[0];
+			return new Response(JSON.stringify({ success: true, user }), { headers: corsHeaders });
+		}
+
+		if (path === '/get_password' && request.method === 'POST') {
+			const body = await request.json();
+			const { email } = body;
+
+			if (!email) {
+				return new Response(JSON.stringify({ error: 'Missing email' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			const { results } = await env.DB.prepare(
+				'SELECT id, name, email, password FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1'
+			).bind(email).all();
+
+			if (results.length === 0) {
+				return new Response(JSON.stringify({ error: 'Email not found' }), {
+					status: 404,
+					headers: corsHeaders
+				});
+			}
+
+			const user = results[0];
+			return new Response(JSON.stringify({
+				success: true,
+				message: 'Password found',
+				email: user.email,
+				password: user.password // ⚠️ chỉ nên dùng cho dev/test
+			}), { headers: corsHeaders });
+		}
+
+		// Danh sách user
 		if (path === '/users') {
 			const page = parseInt(url.searchParams.get('page') || '1');
 			const limit = parseInt(url.searchParams.get('limit') || '20');
@@ -25,6 +112,7 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
+		// Lấy 1 user theo id
 		if (path === '/get_user') {
 			const id = url.searchParams.get('id');
 			if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers: corsHeaders });
@@ -32,6 +120,7 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
+		// Tìm kiếm user
 		if (path === '/search_user') {
 			const q = url.searchParams.get('q')?.trim() || '';
 			const page = parseInt(url.searchParams.get('page') || '1');
@@ -51,6 +140,65 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			const { results } = await env.DB.prepare(query).bind(...params).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
+
+		if (path === '/update_user' && request.method === 'POST') {
+			const body = await request.json();
+			const { id, name, email, phone, address, avatar, sex, lang, role, type } = body;
+
+			// Kiểm tra bắt buộc
+			if (!id) {
+				return new Response(JSON.stringify({ error: 'Missing user id' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			// Lấy dữ liệu hiện tại để giữ nguyên những field chưa cập nhật
+			const existing = await env.DB.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(id).all();
+			if (existing.results.length === 0) {
+				return new Response(JSON.stringify({ error: 'User not found' }), {
+					status: 404,
+					headers: corsHeaders
+				});
+			}
+			const user = existing.results[0];
+
+			// Gán giá trị mới nếu có, nếu không thì giữ giá trị cũ
+			const newName = name ?? user.name;
+			const newEmail = email ?? user.email;
+			const newPhone = phone ?? user.phone;
+			const newAddress = address ?? user.address;
+			const newAvatar = avatar ?? user.avatar;
+			const newSex = sex ?? user.sex;
+			const newLang = lang ?? user.lang;
+			const newRole = role ?? user.role;
+			const newType = type ?? user.type;
+
+			await env.DB.prepare(`
+				UPDATE users SET
+					name = ?, email = ?, phone = ?, address = ?, avatar = ?,
+					sex = ?, lang = ?, role = ?, type = ?
+				WHERE id = ?
+			`).bind(newName, newEmail, newPhone, newAddress, newAvatar, newSex, newLang, newRole, newType, id).run();
+
+			return new Response(JSON.stringify({
+				success: true,
+				message: 'User updated successfully',
+				user: {
+					id,
+					name: newName,
+					email: newEmail,
+					phone: newPhone,
+					address: newAddress,
+					avatar: newAvatar,
+					sex: newSex,
+					lang: newLang,
+					role: newRole,
+					type: newType
+				}
+			}), { headers: corsHeaders });
+		}
+
 
 		return new Response(JSON.stringify({ error: 'Unknown user route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {
