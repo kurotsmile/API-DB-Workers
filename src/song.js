@@ -19,15 +19,47 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			const page = parseInt(url.searchParams.get('page') || '1');
 			const limit = parseInt(url.searchParams.get('limit') || '20');
 			const offset = (page - 1) * limit;
-			const lang = url.searchParams.get('lang') || 'en';
-			const fields = 'id, name, artist, album, genre, lang, link_ytb, mp3, avatar';
-			const { results } = await env.DB.prepare(
-				`SELECT ${fields} FROM song WHERE lang = ? ORDER BY date DESC LIMIT ? OFFSET ?`
-			)
-				.bind(lang, limit, offset)
-				.all();
+
+			const lang = url.searchParams.get('lang'); // có thể null
+			const key = url.searchParams.get('key');   // ví dụ: artist, year, genre, ...
+			const value = url.searchParams.get('value');
+
+			const fields = 'id, name, artist, album, genre, lang, link_ytb, mp3, avatar, year, date';
+
+			let query = `SELECT ${fields} FROM song`;
+			const params = [];
+			const conditions = [];
+
+			// nếu có lang thì thêm vào điều kiện
+			if (lang) {
+				conditions.push('lang = ?');
+				params.push(lang);
+			}
+
+			// nếu có key và value thì thêm điều kiện
+			if (key && value) {
+				conditions.push(`${key} = ?`);
+				params.push(value);
+			}
+
+			// nối các điều kiện
+			if (conditions.length > 0) {
+				query += ' WHERE ' + conditions.join(' AND ');
+			}
+
+			// sắp xếp
+			query += ' ORDER BY date DESC';
+
+			// nếu limit khác -1 thì mới giới hạn
+			if (limit !== -1) {
+				query += ' LIMIT ? OFFSET ?';
+				params.push(limit, offset);
+			}
+
+			const { results } = await env.DB.prepare(query).bind(...params).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
+
 
 		if (path === '/add_song' && request.method === 'POST') {
 			const data = await request.json();
