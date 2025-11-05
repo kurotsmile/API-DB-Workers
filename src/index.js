@@ -40,6 +40,8 @@ export default {
 			case pathname ==='/register':
 			case pathname ==='/get_password':
 			case pathname ==='/update_user':
+			case pathname ==='/update_password':
+			case pathname ==='/update_avatar':
 				return handleUserRequest(request, env, corsHeaders);
 
 			case pathname === '/upload_file' && request.method === 'POST':
@@ -47,9 +49,10 @@ export default {
 			case pathname === '/get_file' && request.method === 'GET':
 				return handleGetFile(request, env, corsHeaders);
 
-			case pathname.startsWith('/add_order'):
-			case pathname.startsWith('/orders'):
-			case pathname.startsWith('/delete_order'):
+			case pathname ==='/add_order':
+			case pathname ==='/orders':
+			case pathname ==='/delete_order':
+			case pathname ==='/report_order':
 				return handleOrdersRequest(request, env, corsHeaders);
 
 			case pathname.startsWith('/contacts'):

@@ -69,6 +69,42 @@ export async function handleOrdersRequest(request, env, corsHeaders) {
 			return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
 		}
 
+		if (path === '/report_order' && method === 'GET') {
+			const date_from = url.searchParams.get('date_from');
+			const date_to = url.searchParams.get('date_to');
+
+			if (!date_from || !date_to) {
+				return new Response(
+				JSON.stringify({ error: 'Missing date_from or date_to' }),
+				{ status: 400, headers: corsHeaders }
+				);
+			}
+
+			// Chỉ lấy các trường cần thiết để hiển thị biểu đồ (ngày, tổng tiền)
+			const query = `
+				SELECT 
+				DATE(created_at) AS date,
+				SUM(amount) AS total_amount,
+				COUNT(*) AS total_orders
+				FROM orders
+				WHERE DATE(created_at) BETWEEN ? AND ?
+				GROUP BY DATE(created_at)
+				ORDER BY DATE(created_at) ASC
+			`;
+
+			const { results } = await env.DB.prepare(query).bind(date_from, date_to).all();
+
+			// Trả về dạng thân thiện cho Chart.js
+			const data = results.map(r => ({
+				date: r.date,
+				total_amount: r.total_amount,
+				total_orders: r.total_orders
+			}));
+
+			return Response.json(data, { headers: corsHeaders });
+		}
+
+
 		// 🚫 Không khớp route nào
 		return new Response(JSON.stringify({ error: 'Unknown order route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {

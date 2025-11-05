@@ -46,7 +46,7 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			//const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
 			//const hashPassword = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-			const { results } = await env.DB.prepare('SELECT id, name, email, avatar,address,phone,sex,type,role, lang FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1')
+			const { results } = await env.DB.prepare('SELECT id, name, email, avatar,address,phone,sex,type,role,birthday,lang FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1')
 				.bind(email, password)
 				.all();
 
@@ -95,7 +95,7 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			const limit = parseInt(url.searchParams.get('limit') || '20');
 			const offset = (page - 1) * limit;
 			const lang = url.searchParams.get('lang') || '';
-			const fields = 'id,address,avatar,email,name,phone,sex,type,role';
+			const fields = 'id,address,avatar,email,name,phone,sex,type,role,birthday';
 
 			let query = `SELECT ${fields} FROM users`;
 			const params = [];
@@ -143,7 +143,7 @@ export async function handleUserRequest(request, env, corsHeaders) {
 
 		if (path === '/update_user' && request.method === 'POST') {
 			const body = await request.json();
-			const { id, name, email, phone, address, avatar, sex, lang, role, type } = body;
+			const { id, name, email, phone, address, avatar, sex, lang, role, type, birthday} = body;
 
 			// Kiểm tra bắt buộc
 			if (!id) {
@@ -173,13 +173,14 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			const newLang = lang ?? user.lang;
 			const newRole = role ?? user.role;
 			const newType = type ?? user.type;
+			const newBirthday = birthday ?? user.birthday;
 
 			await env.DB.prepare(`
 				UPDATE users SET
 					name = ?, email = ?, phone = ?, address = ?, avatar = ?,
-					sex = ?, lang = ?, role = ?, type = ?
+					sex = ?, lang = ?, role = ?, type = ?, birthday = ?
 				WHERE id = ?
-			`).bind(newName, newEmail, newPhone, newAddress, newAvatar, newSex, newLang, newRole, newType, id).run();
+			`).bind(newName, newEmail, newPhone, newAddress, newAvatar, newSex, newLang, newRole, newType, newBirthday, id).run();
 
 			return new Response(JSON.stringify({
 				success: true,
@@ -194,11 +195,107 @@ export async function handleUserRequest(request, env, corsHeaders) {
 					sex: newSex,
 					lang: newLang,
 					role: newRole,
-					type: newType
+					type: newType,
+					birthday:newBirthday
 				}
 			}), { headers: corsHeaders });
 		}
 
+		if (path === '/update_password' && request.method === 'POST') {
+			const body = await request.json();
+			const { id, old_password, new_password } = body;
+
+			// Kiểm tra các trường bắt buộc
+			if (!id || !old_password || !new_password) {
+				return new Response(JSON.stringify({ error: 'Missing fields' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			// Kiểm tra người dùng có tồn tại không
+			const existing = await env.DB.prepare('SELECT id, password FROM users WHERE id = ? LIMIT 1')
+				.bind(id)
+				.all();
+
+			if (existing.results.length === 0) {
+				return new Response(JSON.stringify({ error: 'User not found' }), {
+					status: 404,
+					headers: corsHeaders
+				});
+			}
+
+			const user = existing.results[0];
+
+			// Kiểm tra mật khẩu cũ
+			if (user.password !== old_password) {
+				return new Response(JSON.stringify({ error: 'Old password incorrect' }), {
+					status: 401,
+					headers: corsHeaders
+				});
+			}
+
+			// Cập nhật mật khẩu mới
+			await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?')
+				.bind(new_password, id)
+				.run();
+
+			// Lấy lại thông tin user đầy đủ
+			const { results } = await env.DB.prepare(
+				'SELECT id, name, email, avatar, phone, address, lang, role, type, sex, created_at FROM users WHERE id = ? LIMIT 1'
+			).bind(id).all();
+
+			const updatedUser = results[0] || {};
+
+			return new Response(JSON.stringify({
+				success: true,
+				message: 'Password updated successfully',
+				user: updatedUser
+			}), { headers: corsHeaders });
+		}
+
+		if (path === '/update_avatar' && request.method === 'POST') {
+			const body = await request.json();
+			const { id, avatar } = body;
+
+			// Kiểm tra các trường bắt buộc
+			if (!id || !avatar) {
+				return new Response(JSON.stringify({ error: 'Missing fields' }), {
+				status: 400,
+				headers: corsHeaders
+				});
+			}
+
+			// Kiểm tra người dùng có tồn tại không
+			const existing = await env.DB.prepare(
+				'SELECT id FROM users WHERE id = ? LIMIT 1'
+			).bind(id).all();
+
+			if (existing.results.length === 0) {
+				return new Response(JSON.stringify({ error: 'User not found' }), {
+				status: 404,
+				headers: corsHeaders
+				});
+			}
+
+			// Cập nhật avatar mới
+			await env.DB.prepare('UPDATE users SET avatar = ? WHERE id = ?')
+				.bind(avatar, id)
+				.run();
+
+			// Lấy lại thông tin user sau khi cập nhật
+			const { results } = await env.DB.prepare(
+				'SELECT id, name, email, avatar, phone, address, lang, role, type, sex, created_at FROM users WHERE id = ? LIMIT 1'
+			).bind(id).all();
+
+			const updatedUser = results[0] || {};
+
+			return new Response(JSON.stringify({
+				success: true,
+				message: 'Avatar updated successfully',
+				user: updatedUser
+			}), { headers: corsHeaders });
+		}
 
 		return new Response(JSON.stringify({ error: 'Unknown user route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {

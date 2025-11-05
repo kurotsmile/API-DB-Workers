@@ -6,7 +6,7 @@ export async function handleReportsRequest(request, env, corsHeaders) {
 	try {
 		if (path === '/add_report' && method === 'POST') {
 			const data = await request.json();
-			const { email, type, message,userId} = data;
+			const { email, type, message,userId,object_id} = data;
 
 			if (!email) {
 				return new Response(JSON.stringify({ error: 'Missing email' }), {
@@ -15,7 +15,7 @@ export async function handleReportsRequest(request, env, corsHeaders) {
 				});
 			}
 
-			await env.DB.prepare(`INSERT INTO reports (email, type, message,userId) VALUES (?, ?, ?,?)`).bind(email, type || '', message || '',userId || '').run();
+			await env.DB.prepare(`INSERT INTO reports (email, type, message,userId,object_id) VALUES (?, ?, ?,?,?)`).bind(email, type || '', message || '',userId || '',object_id || '').run();
 
 			return new Response(JSON.stringify({ success: true }), {
 				status: 201,
