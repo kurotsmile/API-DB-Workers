@@ -92,20 +92,81 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			const page = parseInt(url.searchParams.get('page') || '1');
 			const limit = parseInt(url.searchParams.get('limit') || '20');
 			const offset = (page - 1) * limit;
-			let query = 'SELECT id,name,artist,album,genre,lang,link_ytb,mp3,avatar FROM song';
+			const userId = url.searchParams.get('userId') || '';
+
+			let query = `
+				SELECT id, name, artist, album, genre, lang, link_ytb, mp3, avatar 
+				FROM song
+			`;
 			const params = [];
 			const conditions = [];
 
-			if (lang) { conditions.push('lang = ?'); params.push(lang); }
+			if (lang) {
+				conditions.push('lang = ?');
+				params.push(lang);
+			}
 			if (q) {
 				conditions.push('(LOWER(name) LIKE ? OR LOWER(artist) LIKE ?)');
 				params.push(`%${q.toLowerCase()}%`, `%${q.toLowerCase()}%`);
 			}
+
 			if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
 			query += ' ORDER BY date DESC LIMIT ? OFFSET ?';
 			params.push(limit, offset);
 
 			const { results } = await env.DB.prepare(query).bind(...params).all();
+
+			// 🔹 Ghi log text ngắn gọn
+			try {
+				const logQuery = `
+				INSERT INTO logs (type, content, userId, lang)
+				VALUES (?, ?, ?, ?)
+				`;
+				await env.DB.prepare(logQuery)
+				.bind('song', q, userId, lang)
+				.run();
+			} catch (err) {
+				console.error('Log error:', err);
+			}
+
+			return Response.json(results, { headers: corsHeaders });
+		}
+
+
+		if (path === '/report_song' && request.method === 'GET') {
+			const date_from = url.searchParams.get('date_from');
+			const date_to = url.searchParams.get('date_to');
+			const lang = url.searchParams.get('lang'); // tùy chọn lọc riêng 1 ngôn ngữ
+
+			if (!date_from || !date_to) {
+				return new Response(JSON.stringify({ error: 'Missing date_from or date_to' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			let query = `
+				SELECT 
+					lang,
+					DATE(date) AS date,
+					COUNT(*) AS total
+				FROM song
+				WHERE DATE(date) BETWEEN ? AND ?
+			`;
+			const params = [date_from, date_to];
+
+			if (lang) {
+				query += ' AND lang = ?';
+				params.push(lang);
+			}
+
+			query += `
+				GROUP BY lang, DATE(date)
+				ORDER BY date ASC;
+			`;
+
+			const { results } = await env.DB.prepare(query).bind(...params).all();
+
 			return Response.json(results, { headers: corsHeaders });
 		}
 

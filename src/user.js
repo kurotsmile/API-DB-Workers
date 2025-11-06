@@ -1,6 +1,7 @@
 export async function handleUserRequest(request, env, corsHeaders) {
 	const url = new URL(request.url);
 	const path = url.pathname;
+	const method = request.method;
 
 	try {
 		// Đăng ký tài khoản
@@ -296,6 +297,37 @@ export async function handleUserRequest(request, env, corsHeaders) {
 				user: updatedUser
 			}), { headers: corsHeaders });
 		}
+
+		// Báo cáo người dùng theo quốc gia và ngày
+		if (path === '/report_user' && method === 'GET') {
+			const date_from = url.searchParams.get('date_from');
+			const date_to = url.searchParams.get('date_to');
+
+			if (!date_from || !date_to) {
+				return new Response(JSON.stringify({ error: 'Missing date_from or date_to' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			const query = `
+				SELECT 
+					lang,
+					DATE(created_at) AS date,
+					COUNT(*) AS total
+				FROM users
+				WHERE DATE(created_at) BETWEEN ? AND ?
+				GROUP BY lang, DATE(created_at)
+				ORDER BY date ASC;
+			`;
+
+			const { results } = await env.DB.prepare(query)
+				.bind(date_from, date_to)
+				.all();
+
+			return Response.json(results, { headers: corsHeaders });
+		}
+
 
 		return new Response(JSON.stringify({ error: 'Unknown user route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {

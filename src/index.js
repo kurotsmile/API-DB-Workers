@@ -31,6 +31,7 @@ export default {
 			case pathname.startsWith('/add_song'):
 			case pathname.startsWith('/update_song'):
 			case pathname.startsWith('/search_song'):
+			case pathname ==='/report_song':
 				return handleSongRequest(request, env, corsHeaders);
 
 			case pathname ==='/users':
@@ -42,6 +43,7 @@ export default {
 			case pathname ==='/update_user':
 			case pathname ==='/update_password':
 			case pathname ==='/update_avatar':
+			case pathname ==='/report_user':
 				return handleUserRequest(request, env, corsHeaders);
 
 			case pathname === '/upload_file' && request.method === 'POST':
