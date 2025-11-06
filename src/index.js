@@ -4,6 +4,8 @@ import { handleUploadFile, handleGetFile } from './fileR2.js';
 import { handleOrdersRequest } from './orders.js';
 import { handleContactsRequest } from './contacts.js';
 import { handleReportsRequest } from './reports.js';
+import { handleLogRequest } from './log.js';
+
 
 export default {
 	async fetch(request, env) {
@@ -64,6 +66,10 @@ export default {
 
 			case pathname.startsWith('/add_report'):
 				return handleReportsRequest(request, env, corsHeaders);
+			
+			case pathname ==='/list_logs':
+			case pathname ==='/delete_log':
+				return handleLogRequest(request, env, corsHeaders);
 
 			default:
 				return new Response(
