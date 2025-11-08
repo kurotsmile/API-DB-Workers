@@ -6,8 +6,15 @@ export async function handleUserRequest(request, env, corsHeaders) {
 	try {
 		// Đăng ký tài khoản
 		if (path === '/register' && request.method === 'POST') {
-			const body = await request.json();
-			const { name, email, password, phone, lang = 'en' } = body;
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
+			const { name, email, password, phone,sex, lang = 'en' } = body;
 
 			if (!email || !password) {
 				return new Response(JSON.stringify({ error: 'Missing email or password' }), { status: 400, headers: corsHeaders });
@@ -28,33 +35,31 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			const type = 'basic';
 
 			await env.DB.prepare(`
-				INSERT INTO users (name, email, password, phone, lang, created_at, role, type)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			`).bind(name || '', email.trim().toLowerCase(), password, phone || '', lang, createdAt, role, type).run();
+				INSERT INTO users (name, email, password, phone,sex, lang, created_at, role, type)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`).bind(name || '', email.trim().toLowerCase(), password, phone || '',sex || '', lang, createdAt, role, type).run();
 
 			return new Response(JSON.stringify({ success: true, message: 'User registered successfully' }), { headers: corsHeaders });
 		}
 
 		// Đăng nhập
-		if (path === '/login' && request.method === 'POST') {
-			const body = await request.json();
+		if (path === "/login" && request.method === "POST") {
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
 			const { email, password } = body;
-
 			if (!email || !password) {
-				return new Response(JSON.stringify({ error: 'Missing email or password' }), { status: 400, headers: corsHeaders });
+				return new Response(JSON.stringify({ error: "Missing email or password" }), { status: 400, headers: corsHeaders });
 			}
-
-			//const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-			//const hashPassword = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-			const { results } = await env.DB.prepare('SELECT id, name, email, avatar,address,phone,sex,type,role,birthday,lang FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1')
-				.bind(email, password)
-				.all();
-
+			const { results } = await env.DB.prepare("SELECT id, name, email, avatar, address, phone, sex, type, role, birthday, lang FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1").bind(email, password).all();
 			if (results.length === 0) {
-				return new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401, headers: corsHeaders });
+				return new Response(JSON.stringify({ error: "Invalid email or password" }), { status: 401, headers: corsHeaders });
 			}
-
 			const user = results[0];
 			return new Response(JSON.stringify({ success: true, user }), { headers: corsHeaders });
 		}
@@ -91,24 +96,31 @@ export async function handleUserRequest(request, env, corsHeaders) {
 		}
 
 		// Danh sách user
-		if (path === '/users') {
-			const page = parseInt(url.searchParams.get('page') || '1');
-			const limit = parseInt(url.searchParams.get('limit') || '20');
+		if (path === "/users") {
+			const page = parseInt(url.searchParams.get("page") || "1");
+			const limit = parseInt(url.searchParams.get("limit") || "20");
 			const offset = (page - 1) * limit;
-			const lang = url.searchParams.get('lang') || '';
-			const fields = 'id,address,avatar,email,name,phone,sex,type,role,birthday';
-
+			const lang = url.searchParams.get("lang") || "";
+			const fields = "id, address, avatar, email, name, phone, sex, type, role, birthday";
 			let query = `SELECT ${fields} FROM users`;
 			const params = [];
-
 			if (lang) {
-				query += ' WHERE lang = ?';
+				query += " WHERE lang = ?";
 				params.push(lang);
 			}
-
-			query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-			params.push(limit, offset);
-
+			if (page === 0) {
+				query += " ORDER BY RANDOM()";
+			} else {
+				query += " ORDER BY created_at DESC";
+			}
+			if (limit !== -1) {
+				query += " LIMIT ?";
+				params.push(limit);
+				if (page > 0) {
+				query += " OFFSET ?";
+				params.push(offset);
+				}
+			}
 			const { results } = await env.DB.prepare(query).bind(...params).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
@@ -143,7 +155,14 @@ export async function handleUserRequest(request, env, corsHeaders) {
 		}
 
 		if (path === '/update_user' && request.method === 'POST') {
-			const body = await request.json();
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
 			const { id, name, email, phone, address, avatar, sex, lang, role, type, birthday} = body;
 
 			// Kiểm tra bắt buộc
@@ -326,6 +345,71 @@ export async function handleUserRequest(request, env, corsHeaders) {
 				.all();
 
 			return Response.json(results, { headers: corsHeaders });
+		}
+
+		if (path === '/count_user') {
+			try {
+				const role = url.searchParams.get('role');
+				const type = url.searchParams.get('type');
+
+				let query = 'SELECT COUNT(*) AS total FROM users';
+				const conditions = [];
+				const params = [];
+
+				if (role) {
+					conditions.push('role = ?');
+					params.push(role);
+				}
+
+				if (type) {
+					conditions.push('type = ?');
+					params.push(type);
+				}
+
+				if (conditions.length > 0) {
+					query += ' WHERE ' + conditions.join(' AND ');
+				}
+
+				const { results } = await env.DB.prepare(query).bind(...params).all();
+				const total = results[0]?.total || 0;
+
+				return Response.json({ total }, { headers: corsHeaders });
+			} catch (err) {
+				return new Response(JSON.stringify({ error: err.message }), {
+					status: 500,
+					headers: corsHeaders
+				});
+			}
+		}
+
+		// Xóa user theo id
+		if (path === '/delete_u') {
+			const id = url.searchParams.get('id');
+			if (!id) {
+				return new Response(JSON.stringify({ error: 'Missing id' }), {
+					status: 400,
+					headers: corsHeaders
+				});
+			}
+
+			try {
+				const query = 'DELETE FROM users WHERE id = ?';
+				const result = await env.DB.prepare(query).bind(id).run();
+
+				if (result.success) {
+					return Response.json({ success: true, message: 'User deleted successfully' }, { headers: corsHeaders });
+				} else {
+					return new Response(JSON.stringify({ error: 'User not found or delete failed' }), {
+						status: 404,
+						headers: corsHeaders
+					});
+				}
+			} catch (err) {
+				return new Response(JSON.stringify({ error: err.message }), {
+					status: 500,
+					headers: corsHeaders
+				});
+			}
 		}
 
 

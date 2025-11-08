@@ -5,7 +5,7 @@ import { handleOrdersRequest } from './orders.js';
 import { handleContactsRequest } from './contacts.js';
 import { handleReportsRequest } from './reports.js';
 import { handleLogRequest } from './log.js';
-
+import { handleAppRequest } from './app.js';
 
 export default {
 	async fetch(request, env) {
@@ -46,6 +46,8 @@ export default {
 			case pathname ==='/update_password':
 			case pathname ==='/update_avatar':
 			case pathname ==='/report_user':
+			case pathname ==='/count_user':
+			case pathname ==='/delete_u':
 				return handleUserRequest(request, env, corsHeaders);
 
 			case pathname === '/upload_file' && request.method === 'POST':
@@ -70,6 +72,13 @@ export default {
 			case pathname ==='/list_logs':
 			case pathname ==='/delete_log':
 				return handleLogRequest(request, env, corsHeaders);
+			
+			case pathname ==='/list_app_img':
+			case pathname ==='/add_app_img':
+			case pathname ==='/delete_app_img':
+			case pathname ==='/get_app_img':
+			case pathname ==='/update_app_img':
+				return handleAppRequest(request,env,corsHeaders);
 
 			default:
 				return new Response(
