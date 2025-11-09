@@ -74,10 +74,10 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
             }
         }
 
-        if (path === '/list_top_player' && method === 'GET') {
+        if (path === '/list_top_player') {
             const appId = url.searchParams.get('appId');
             const mode = url.searchParams.get('mode') || '';
-            const userId = url.searchParams.get('userId');
+            const userId = url.searchParams.get('userId') || '';
             const limit = parseInt(url.searchParams.get('limit') || '20');
             const page = parseInt(url.searchParams.get('page') || '1');
             const offset = (page - 1) * limit;
