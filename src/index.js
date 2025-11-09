@@ -6,6 +6,7 @@ import { handleContactsRequest } from './contacts.js';
 import { handleReportsRequest } from './reports.js';
 import { handleLogRequest } from './log.js';
 import { handleAppRequest } from './app.js';
+import { handleTopPlayerRequest } from './top_player.js';
 
 export default {
 	async fetch(request, env) {
@@ -79,6 +80,11 @@ export default {
 			case pathname ==='/get_app_img':
 			case pathname ==='/update_app_img':
 				return handleAppRequest(request,env,corsHeaders);
+			
+			case pathname ==='/update_top_player':
+			case pathname ==='/list_top_player':
+			case pathname ==='/delete_top_player':
+				return handleTopPlayerRequest(request,env,corsHeaders);
 
 			default:
 				return new Response(
