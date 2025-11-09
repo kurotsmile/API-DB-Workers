@@ -222,7 +222,14 @@ export async function handleUserRequest(request, env, corsHeaders) {
 		}
 
 		if (path === '/update_password' && request.method === 'POST') {
-			const body = await request.json();
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
 			const { id, old_password, new_password } = body;
 
 			// Kiểm tra các trường bắt buộc
