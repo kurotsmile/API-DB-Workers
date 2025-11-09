@@ -1,7 +1,8 @@
 export async function handleTopPlayerRequest(request, env, corsHeaders) {
 	const url = new URL(request.url);
 	const path = url.pathname;
-
+	const method = request.method;
+    
     try{
 
         if (path === '/update_top_player' && method === 'POST') {
