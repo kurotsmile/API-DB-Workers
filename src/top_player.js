@@ -82,14 +82,7 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
             const page = parseInt(url.searchParams.get('page') || '1');
             const offset = (page - 1) * limit;
 
-            if (!appId) {
-                return new Response(
-                    JSON.stringify({ error: 'Missing appId' }),
-                    { status: 400, headers: corsHeaders }
-                );
-            }
-
-            // Câu query chính có JOIN users để lấy avatar và name
+            // Tạo câu query cơ bản
             let query = `
                 SELECT 
                     top_player.*,
@@ -97,9 +90,15 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
                     users.avatar AS user_avatar
                 FROM top_player
                 LEFT JOIN users ON top_player.userId = users.id
-                WHERE top_player.appId = ?
+                WHERE 1=1
             `;
-            const params = [appId];
+            const params = [];
+
+            // Nếu có appId thì lọc theo appId, còn không thì lấy tất cả
+            if (appId) {
+                query += ` AND top_player.appId = ?`;
+                params.push(appId);
+            }
 
             if (mode) {
                 query += ` AND top_player.mode = ?`;
@@ -116,9 +115,14 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
 
             const result = await env.DB.prepare(query).bind(...params).all();
 
-            // Đếm tổng số bản ghi (phục vụ phân trang)
-            let countQuery = `SELECT COUNT(*) as total FROM top_player WHERE appId = ?`;
-            const countParams = [appId];
+            // Câu query đếm tổng số bản ghi (phục vụ phân trang)
+            let countQuery = `SELECT COUNT(*) as total FROM top_player WHERE 1=1`;
+            const countParams = [];
+
+            if (appId) {
+                countQuery += ` AND appId = ?`;
+                countParams.push(appId);
+            }
 
             if (mode) {
                 countQuery += ` AND mode = ?`;
@@ -145,9 +149,8 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
             );
         }
 
-        if (path === '/delete_top_player' && method === 'POST') {
-            const data = await request.json();
-            const { id } = data;
+        if (path === '/delete_top_player' && method === 'GET') {
+            const id = url.searchParams.get('id');
 
             if (!id) {
                 return new Response(
