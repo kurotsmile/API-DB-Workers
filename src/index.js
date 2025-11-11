@@ -60,6 +60,7 @@ export default {
 			case pathname ==='/orders':
 			case pathname ==='/delete_order':
 			case pathname ==='/report_order':
+			case pathname ==='/check_pay':
 				return handleOrdersRequest(request, env, corsHeaders);
 
 			case pathname.startsWith('/contacts'):

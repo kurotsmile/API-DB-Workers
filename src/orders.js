@@ -11,10 +11,7 @@ export async function handleOrdersRequest(request, env, corsHeaders) {
 			const offset = (page - 1) * limit;
 			const email = url.searchParams.get('email')?.trim() || '';
 
-			let query = `
-				SELECT id, created_at, order_name, user_name, user_email, country, type, amount, currency
-				FROM orders
-			`;
+			let query = `SELECT * FROM orders`;
 			const params = [];
 
 			if (email) {
@@ -32,7 +29,7 @@ export async function handleOrdersRequest(request, env, corsHeaders) {
 		// ➕ Thêm đơn hàng mới
 		if (path === '/add_order' && method === 'POST') {
 			const data = await request.json();
-			const { order_name, user_name, user_email, country, type, amount, currency } = data;
+			const { order_name, user_name, user_email, country, type, amount, currency,user_id,product_id} = data;
 
 			if (!user_email) {
 				return new Response(
@@ -42,12 +39,12 @@ export async function handleOrdersRequest(request, env, corsHeaders) {
 			}
 
 			const query = `
-				INSERT INTO orders (order_name, user_name, user_email, country, type, amount, currency)
-				VALUES (?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO orders (order_name, user_name, user_email, country, type, amount, currency,user_id,product_id)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`;
 
 			await env.DB.prepare(query)
-				.bind(order_name, user_name, user_email, country, type, amount, currency)
+				.bind(order_name, user_name, user_email, country, type, amount, currency,user_id||'',product_id||'')
 				.run();
 
 			return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
@@ -104,8 +101,43 @@ export async function handleOrdersRequest(request, env, corsHeaders) {
 			return Response.json(data, { headers: corsHeaders });
 		}
 
+		if (path === '/check_pay' && method === 'POST') {
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
+			const { user_id,product_id } = body;
 
-		// 🚫 Không khớp route nào
+			if (!user_id || !product_id) {
+				return new Response(
+				JSON.stringify({ error: 'Missing user_id or product_id' }),
+				{ status: 400, headers: corsHeaders }
+				);
+			}
+
+			const query = `
+				SELECT * FROM orders
+				WHERE user_id = ? AND product_id = ?
+				ORDER BY created_at DESC
+				LIMIT 1
+			`;
+
+			const { results } = await env.DB.prepare(query).bind(user_id, product_id).all();
+
+			if (results.length > 0) {
+				return Response.json({
+				purchased: true,
+				order: results[0]
+				}, { headers: corsHeaders });
+			}
+
+			return Response.json({ purchased: false }, { headers: corsHeaders });
+		}
+
 		return new Response(JSON.stringify({ error: 'Unknown order route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {
 		return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });

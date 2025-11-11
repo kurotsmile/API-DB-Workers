@@ -75,7 +75,7 @@ export async function handleTopPlayerRequest(request, env, corsHeaders) {
         }
 
         if (path === '/list_top_player') {
-            const appId = url.searchParams.get('appId');
+            const appId = url.searchParams.get('appId') || '';
             const mode = url.searchParams.get('mode') || '';
             const userId = url.searchParams.get('userId') || '';
             const limit = parseInt(url.searchParams.get('limit') || '20');
