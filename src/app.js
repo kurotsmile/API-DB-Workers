@@ -80,7 +80,7 @@ export async function handleAppRequest(request, env, corsHeaders) {
             }
 
             try {
-                const query = 'SELECT * FROM app_img WHERE id = ? LIMIT 1';
+                const query = 'SELECT * FROM app_img WHERE app_id = ? LIMIT 1';
                 const { results } = await env.DB.prepare(query).bind(id).all();
 
                 if (!results || results.length === 0) {
