@@ -8,7 +8,7 @@ export async function handleAppRequest(request, env, corsHeaders) {
             try {
                 const data = await request.json();
 
-                const sql = `INSERT INTO app_img (id, app_id, img1, img2, img3, img4, img5)
+                const sql = `INSERT INTO app_img (id, app_id, img1, img2, img3, img4, img5, img6, img7, img8, img9, img10)
                             VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
                 await env.DB.prepare(sql).bind(
@@ -18,7 +18,12 @@ export async function handleAppRequest(request, env, corsHeaders) {
                     data.img2 || '',
                     data.img3 || '',
                     data.img4 || '',
-                    data.img5 || ''
+                    data.img5 || '',
+                    data.img6 || '',
+                    data.img7 || '',
+                    data.img8 || '',
+                    data.img9 || '',
+                    data.img10 || ''
                 ).run();
 
                 return new Response(JSON.stringify({ success: true, message: 'App images added successfully' }), {
@@ -119,7 +124,12 @@ export async function handleAppRequest(request, env, corsHeaders) {
                         img2 = ?, 
                         img3 = ?, 
                         img4 = ?, 
-                        img5 = ?
+                        img5 = ?,
+                        img6 = ?,
+                        img7 = ?,
+                        img8 = ?,
+                        img9 = ?,
+                        img10 = ?
                     WHERE id = ?
                 `;
 
@@ -130,6 +140,11 @@ export async function handleAppRequest(request, env, corsHeaders) {
                     data.img3 || '',
                     data.img4 || '',
                     data.img5 || '',
+                    data.img6 || '',
+                    data.img7 || '',
+                    data.img8 || '',
+                    data.img9 || '',
+                    data.img10 || '',
                     id
                 ).run();
 
