@@ -1,15 +1,16 @@
 export async function handleAppRequest(request, env, corsHeaders) {
-	const url = new URL(request.url);
-	const path = url.pathname;
+    const url = new URL(request.url);
+    const path = url.pathname;
 
-    try{
+    try {
 
         if (path === '/add_app_img' && request.method === 'POST') {
             try {
                 const data = await request.json();
 
-                const sql = `INSERT INTO app_img (id, app_id, img1, img2, img3, img4, img5, img6, img7, img8, img9, img10)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)`;
+                const sql = `INSERT INTO app_img (
+            id, app_id, img1, img2, img3, img4, img5, img6, img7, img8, img9, img10
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
                 await env.DB.prepare(sql).bind(
                     data.id || null,
@@ -26,7 +27,10 @@ export async function handleAppRequest(request, env, corsHeaders) {
                     data.img10 || ''
                 ).run();
 
-                return new Response(JSON.stringify({ success: true, message: 'App images added successfully' }), {
+                return new Response(JSON.stringify({
+                    success: true,
+                    message: 'App images added successfully'
+                }), {
                     headers: corsHeaders
                 });
 
@@ -167,8 +171,8 @@ export async function handleAppRequest(request, env, corsHeaders) {
             }
         }
 
-    	return new Response(JSON.stringify({ error: 'Unknown app route' }), { status: 404, headers: corsHeaders });
-	} catch (err) {
-		return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
-	}
+        return new Response(JSON.stringify({ error: 'Unknown app route' }), { status: 404, headers: corsHeaders });
+    } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    }
 }

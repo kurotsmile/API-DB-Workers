@@ -3,6 +3,15 @@ export async function handleSongRequest(request, env, corsHeaders) {
 	const path = url.pathname;
 
 	try {
+
+		if (path === '/count_song') {
+			const { results } = await env.DB
+				.prepare('SELECT COUNT(*) AS total FROM song')
+				.all();
+
+			return Response.json(results[0], { headers: corsHeaders });
+		}
+
 		if (path === '/get_song') {
 			const id = url.searchParams.get('id');
 			if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers: corsHeaders });
@@ -82,6 +91,7 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			const limit = parseInt(url.searchParams.get('limit') || '20');
 			const offset = (page - 1) * limit;
 			const userId = url.searchParams.get('userId') || '';
+			const log = url.searchParams.get('log') || '1';
 
 			let query = `
 				SELECT id, name, artist, album, genre, lang, link_ytb, mp3, avatar 
@@ -106,16 +116,18 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			const { results } = await env.DB.prepare(query).bind(...params).all();
 
 			// 🔹 Ghi log text ngắn gọn
-			try {
-				const logQuery = `
-				INSERT INTO logs (type, content, userId, lang)
-				VALUES (?, ?, ?, ?)
-				`;
-				await env.DB.prepare(logQuery)
-				.bind('song', q, userId, lang)
-				.run();
-			} catch (err) {
-				console.error('Log error:', err);
+			if(log=='1'){
+				try {
+					const logQuery = `
+					INSERT INTO logs (type, content, userId, lang)
+					VALUES (?, ?, ?, ?)
+					`;
+					await env.DB.prepare(logQuery)
+					.bind('song', q, userId, lang)
+					.run();
+				} catch (err) {
+					console.error('Log error:', err);
+				}
 			}
 
 			return Response.json(results, { headers: corsHeaders });

@@ -132,3 +132,30 @@ export async function handleGetFile(request, env, corsHeaders) {
 		);
 	}
 }
+
+export async function handleDeleteFile(request, env, corsHeaders) {
+  try {
+    const data = await request.json();
+    const filePath = data.file;
+
+    if (!filePath) {
+      return new Response(
+        JSON.stringify({ error: "Missing file" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    await env.MY_BUCKET.delete(filePath);
+
+    return new Response(
+      JSON.stringify({ success: true, deleted: filePath }),
+      { headers: corsHeaders }
+    );
+
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Delete error: " + err.message }),
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}

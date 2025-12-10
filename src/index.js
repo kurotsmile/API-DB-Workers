@@ -16,7 +16,7 @@ export default {
 		// Thiết lập CORS headers
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
-			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			"Access-Control-Allow-Methods": 'GET,HEAD,POST,OPTIONS',
 			'Access-Control-Allow-Headers': '*',
 		};
 
@@ -29,12 +29,13 @@ export default {
 		switch (true) {
 			case pathname	===	'/song':
 			case pathname	===	'/get_song':
-			case pathname.startsWith('/song_random'):
-			case pathname.startsWith('/list_song'):
-			case pathname.startsWith('/add_song'):
-			case pathname.startsWith('/update_song'):
-			case pathname.startsWith('/search_song'):
-			case pathname ==='/report_song':
+			case pathname	==='/song_random':
+			case pathname	==='/list_song':
+			case pathname	==='/add_song':
+			case pathname	==='/update_song':
+			case pathname	==='/search_song':
+			case pathname 	==='/report_song':
+			case pathname 	==='/count_song':
 				return handleSongRequest(request, env, corsHeaders);
 
 			case pathname ==='/users':
@@ -53,6 +54,8 @@ export default {
 
 			case pathname === '/upload_file' && request.method === 'POST':
 				return handleUploadFile(request, env, corsHeaders);
+			case pathname === '/delete_file' && request.method === "POST":
+				return handleDeleteFile(request, env, corsHeaders);
 			case pathname === '/get_file' && request.method === 'GET':
 				return handleGetFile(request, env, corsHeaders);
 
