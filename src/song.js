@@ -171,6 +171,35 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
+		if (path === '/delete_song' && request.method === 'POST') {
+			try {
+				const data = await request.json();
+				const id = data.id;
+
+				if (!id) {
+					return new Response(
+						JSON.stringify({ error: 'Missing id' }),
+						{ status: 400, headers: corsHeaders }
+					);
+				}
+
+				const sql = `DELETE FROM song WHERE id = ?`;
+
+				const result = await env.DB.prepare(sql).bind(id).run();
+
+				return new Response(
+					JSON.stringify({ success: true, deleted_id: id, changes: result.changes }),
+					{ headers: corsHeaders }
+				);
+
+			} catch (err) {
+				return new Response(
+					JSON.stringify({ error: err.message }),
+					{ status: 500, headers: corsHeaders }
+				);
+			}
+		}
+
 		return new Response(JSON.stringify({ error: 'Unknown song route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {
 		return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });

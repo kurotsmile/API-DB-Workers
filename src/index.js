@@ -36,6 +36,7 @@ export default {
 			case pathname	==='/search_song':
 			case pathname 	==='/report_song':
 			case pathname 	==='/count_song':
+			case pathname	==='/delete_song':
 				return handleSongRequest(request, env, corsHeaders);
 
 			case pathname ==='/users':
