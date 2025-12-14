@@ -29,6 +29,24 @@ export async function handleContactsRequest(request, env, corsHeaders) {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
+		if (path === '/contacts_count' && method === 'GET') {
+			const email = url.searchParams.get('email')?.trim() || '';
+
+			let query = `
+				SELECT COUNT(*) AS total
+				FROM contacts
+			`;
+			const params = [];
+
+			if (email) {query += ' WHERE email = ?';params.push(email);}
+
+			const { results } = await env.DB.prepare(query).bind(...params).all();
+			return Response.json(
+				{ total: results?.[0]?.total || 0 },
+				{ headers: corsHeaders }
+			);
+		}
+
 		// ➕ Thêm liên hệ mới
 		if (path === '/add_contact' && method === 'POST') {
 			const data = await request.json();
