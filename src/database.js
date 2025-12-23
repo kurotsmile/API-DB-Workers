@@ -63,6 +63,25 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
             return new Response(JSON.stringify({ total: rs.total }), { headers: corsHeaders });
         }
 
+        if (path === '/update_table' && method === 'POST') {
+            const { table, data } = await request.json();
+            if (!table || !data || typeof data !== 'object' || !data.id) return new Response(JSON.stringify({ error: 'Missing table or id' }), { status: 400, headers: corsHeaders });
+
+            if (!/^[a-zA-Z0-9_]+$/.test(table)) return new Response(JSON.stringify({ error: 'Invalid table name' }), { status: 400, headers: corsHeaders });
+
+            const { id, ...fields } = data;
+            const keys = Object.keys(fields);
+            if (!keys.length) return new Response(JSON.stringify({ error: 'No data to update' }), { status: 400, headers: corsHeaders });
+
+            const values = Object.values(fields);
+            const set = keys.map(k => `${k}=?`).join(',');
+
+            const sql = `UPDATE ${table} SET ${set} WHERE id=?`;
+            const rs = await env.DB.prepare(sql).bind(...values, id).run();
+
+            return new Response(JSON.stringify({ success: true, changes: rs.changes }), { headers: corsHeaders });
+        }
+
 		// 🚫 Không khớp route nào
 		return new Response(JSON.stringify({ error: 'Unknown database route' }), {
 			status: 404,

@@ -100,6 +100,7 @@ export default {
 			case pathname === '/read_table':
 			case pathname === '/delete_table':
 			case pathname === '/count_table':
+			case pathname === '/update_table':
 				return handleDatabaseRequest(request, env, corsHeaders);
 			default:
 				return new Response(
