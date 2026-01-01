@@ -17,19 +17,64 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
 
         if (path === '/read_table' && method === 'POST') {
             const { table, data = {} } = await request.json();
-            if (!table) return new Response(JSON.stringify({ error: 'Missing table' }), { status: 400, headers: corsHeaders });
+            if (!table) {
+                return new Response(
+                    JSON.stringify({ error: 'Missing table' }),
+                    { status: 400, headers: corsHeaders }
+                );
+            }
 
-            const { limit, page, ...filters } = data;
-            const keys = Object.keys(filters);
-            const values = Object.values(filters);
+            const {
+                limit,
+                page,
+                order_key,
+                order_type,
+                ...filters
+            } = data;
+
+            const allowOrderKeys = ['id', 'created_at', 'updated_at', 'name', 'sync_status'];
 
             let sql = `SELECT * FROM ${table}`;
-            if (keys.length) sql += ' WHERE ' + keys.map(k => `${k}=?`).join(' AND ');
-            if (limit && page) sql += ` LIMIT ${parseInt(limit)} OFFSET ${(parseInt(page)-1)*parseInt(limit)}`;
+            const keys = Object.keys(filters);
+
+            const values = Object.values(filters).map(v =>
+                v === null || v === undefined ? v : String(v)
+            );
+
+            // WHERE
+            if (keys.length) {
+                sql += ' WHERE ' + keys.map(k => `${k}=?`).join(' AND ');
+            }
+
+            // ===== ORDER BY =====
+            if (page === -1) {
+                // 🔥 random khi page = -1
+                sql += ' ORDER BY RANDOM()';
+            } else if (order_key && allowOrderKeys.includes(order_key)) {
+                const type = (order_type || 'ASC').toUpperCase() === 'DESC'
+                    ? 'DESC'
+                    : 'ASC';
+                sql += ` ORDER BY ${order_key} ${type}`;
+            }
+
+            // ===== LIMIT / OFFSET =====
+            if (limit) {
+                if (page === -1) {
+                    // random + limit
+                    sql += ` LIMIT ${parseInt(limit)}`;
+                } else if (page) {
+                    sql += ` LIMIT ${parseInt(limit)} OFFSET ${(parseInt(page) - 1) * parseInt(limit)}`;
+                }
+            }
 
             const rs = await env.DB.prepare(sql).bind(...values).all();
-            return new Response(JSON.stringify(rs.results), { headers: corsHeaders });
+
+            return new Response(
+                JSON.stringify(rs.results),
+                { headers: corsHeaders }
+            );
         }
+
 
         if (path === '/delete_table' && method === 'POST') {
             const { table, data } = await request.json();
@@ -81,6 +126,32 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
 
             return new Response(JSON.stringify({ success: true, changes: rs.changes }), { headers: corsHeaders });
         }
+
+
+		if (path === '/search_table' && method === 'POST') {
+            const { table, data = {} } = await request.json();
+            const {q,page,limit,offset, ...fields } = data;
+
+			let query = `
+				SELECT *
+				FROM ${table}
+			`;
+			const params = [];
+			const conditions = [];
+
+			if (q) {
+				conditions.push('LOWER(name) LIKE ? ');
+				params.push(`%${q.toLowerCase()}%`);
+			}
+			if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
+            if (limit && page) {
+			    query += ' LIMIT ? OFFSET ?';
+			    params.push(limit, offset);
+            }
+
+			const { results } = await env.DB.prepare(query).bind(...params).all();
+			return Response.json(results, { headers: corsHeaders });
+		}
 
 		// 🚫 Không khớp route nào
 		return new Response(JSON.stringify({ error: 'Unknown database route' }), {

@@ -5,7 +5,6 @@ import { handleOrdersRequest } from './orders.js';
 import { handleContactsRequest } from './contacts.js';
 import { handleReportsRequest } from './reports.js';
 import { handleLogRequest } from './log.js';
-import { handleAppRequest } from './app.js';
 import { handleTopPlayerRequest } from './top_player.js';
 import { handleDatabaseRequest } from './database.js';
 
@@ -38,6 +37,7 @@ export default {
 			case pathname === '/report_song':
 			case pathname === '/count_song':
 			case pathname === '/delete_song':
+			case pathname === '/list_song_category':
 				return handleSongRequest(request, env, corsHeaders);
 
 			case pathname === '/users':
@@ -84,13 +84,6 @@ export default {
 			case pathname === '/delete_log':
 				return handleLogRequest(request, env, corsHeaders);
 
-			case pathname === '/list_app_img':
-			case pathname === '/add_app_img':
-			case pathname === '/delete_app_img':
-			case pathname === '/get_app_img':
-			case pathname === '/update_app_img':
-				return handleAppRequest(request, env, corsHeaders);
-
 			case pathname === '/update_top_player':
 			case pathname === '/list_top_player':
 			case pathname === '/delete_top_player':
@@ -101,6 +94,7 @@ export default {
 			case pathname === '/delete_table':
 			case pathname === '/count_table':
 			case pathname === '/update_table':
+			case pathname === '/search_table':
 				return handleDatabaseRequest(request, env, corsHeaders);
 			default:
 				return new Response(

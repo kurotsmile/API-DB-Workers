@@ -200,6 +200,71 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			}
 		}
 
+		if (path === "/list_song_category") {
+			const page = parseInt(url.searchParams.get("page") || "1");
+			const limit = parseInt(url.searchParams.get("limit") || "20");
+			const offset = (page - 1) * limit;
+			const lang = url.searchParams.get("lang");
+			const field = url.searchParams.get("field") || "artist";
+
+			// ✅ whitelist field cho phép
+			const allowFields = [
+				"artist",
+				"album",
+				"genre",
+				"year",
+				"lang"
+			];
+
+			if (!allowFields.includes(field)) {
+				return Response.json(
+					{ error: "Invalid field" },
+					{ status: 400, headers: corsHeaders }
+				);
+			}
+
+			let query = `
+				SELECT DISTINCT ${field}
+				FROM song
+			`;
+			const params = [];
+			const conditions = [];
+
+			// filter theo ngôn ngữ
+			if (lang) {
+				conditions.push("lang = ?");
+				params.push(lang);
+			}
+
+			// bỏ giá trị NULL / rỗng
+			conditions.push(`${field} IS NOT NULL`);
+			conditions.push(`${field} != ''`);
+
+			if (conditions.length > 0) {
+				query += " WHERE " + conditions.join(" AND ");
+			}
+
+			// sắp xếp
+			if (page === 0) {
+				query += " ORDER BY RANDOM()";
+			} else {
+				query += ` ORDER BY ${field} COLLATE NOCASE ASC`;
+			}
+
+			// phân trang
+			if (limit !== -1) {
+				query += " LIMIT ? OFFSET ?";
+				params.push(limit, offset);
+			}
+
+			const { results } = await env.DB
+				.prepare(query)
+				.bind(...params)
+				.all();
+
+			return Response.json(results, { headers: corsHeaders });
+		}
+
 		return new Response(JSON.stringify({ error: 'Unknown song route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {
 		return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
