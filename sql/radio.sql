@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS radio (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  station TEXT DEFAULT '',
+  url TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  icon TEXT DEFAULT '',
+  country TEXT DEFAULT '',
+  city TEXT DEFAULT '',
+  lang TEXT DEFAULT '',
+  genres TEXT DEFAULT '',
+  audioFormat TEXT DEFAULT '',
+  dataFormat TEXT DEFAULT '',
+  excludeCodec TEXT DEFAULT 'None',
+  bitrate INTEGER DEFAULT 128,
+  chunkSize INTEGER DEFAULT 32,
+  bufferSize INTEGER DEFAULT 48,
+  rating REAL DEFAULT 0,
+  sync_status INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
