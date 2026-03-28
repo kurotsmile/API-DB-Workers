@@ -24,5 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_midis_name ON midis(name);
 CREATE TABLE IF NOT EXISTS midi_categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
+  cover_color TEXT NOT NULL DEFAULT '#ff8a3d',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

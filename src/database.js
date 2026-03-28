@@ -3,6 +3,13 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
 	const path = url.pathname;
 	const method = request.method;
 
+    const isSafeIdentifier = (value) => /^[a-zA-Z0-9_]+$/.test(String(value || ''));
+    const parsePositiveInt = (value, fallback = null) => {
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    };
+    const isTruthyFlag = (value) => value === true || value === 1 || value === '1' || value === 'true';
+
 	try {
         if (path === '/inster_table' && method === 'POST') {
             const { table, data } = await request.json();
@@ -23,8 +30,16 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
                     { status: 400, headers: corsHeaders }
                 );
             }
+            if (!isSafeIdentifier(table)) {
+                return new Response(
+                    JSON.stringify({ error: 'Invalid table name' }),
+                    { status: 400, headers: corsHeaders }
+                );
+            }
 
             const {
+                select,
+                with_total,
                 limit,
                 page,
                 order_key,
@@ -32,25 +47,49 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
                 ...filters
             } = data;
 
-            const allowOrderKeys = ['id', 'created_at', 'updated_at', 'name', 'sync_status'];
+            const selectedFields = typeof select === 'string' && select.trim()
+                ? select.split(',').map(field => field.trim()).filter(Boolean)
+                : ['*'];
+            const isRandomPage = page === -1 || String(page) === '-1';
+            const parsedLimit = parsePositiveInt(limit);
+            const parsedPage = isRandomPage ? -1 : parsePositiveInt(page, 1);
 
-            let sql = `SELECT * FROM ${table}`;
-            const keys = Object.keys(filters);
+            if (selectedFields[0] !== '*' && !selectedFields.every(isSafeIdentifier)) {
+                return new Response(
+                    JSON.stringify({ error: 'Invalid select fields' }),
+                    { status: 400, headers: corsHeaders }
+                );
+            }
 
-            const values = Object.values(filters).map(v =>
-                v === null || v === undefined ? v : String(v)
-            );
+            if (order_key && !isSafeIdentifier(order_key)) {
+                return new Response(
+                    JSON.stringify({ error: 'Invalid order key' }),
+                    { status: 400, headers: corsHeaders }
+                );
+            }
+
+            const filterKeys = Object.keys(filters).filter(key => {
+                const value = filters[key];
+                return isSafeIdentifier(key) && value !== undefined && value !== null && value !== '';
+            });
+
+            const selectClause = selectedFields[0] === '*' ? '*' : selectedFields.join(', ');
+            let sql = `SELECT ${selectClause} FROM ${table}`;
+            const safeValues = filterKeys.map(key => {
+                const value = filters[key];
+                return value === null || value === undefined ? value : String(value);
+            });
 
             // WHERE
-            if (keys.length) {
-                sql += ' WHERE ' + keys.map(k => `${k}=?`).join(' AND ');
+            if (filterKeys.length) {
+                sql += ' WHERE ' + filterKeys.map(k => `${k}=?`).join(' AND ');
             }
 
             // ===== ORDER BY =====
-            if (page === -1) {
+            if (isRandomPage) {
                 // 🔥 random khi page = -1
                 sql += ' ORDER BY RANDOM()';
-            } else if (order_key && allowOrderKeys.includes(order_key)) {
+            } else if (order_key) {
                 const type = (order_type || 'ASC').toUpperCase() === 'DESC'
                     ? 'DESC'
                     : 'ASC';
@@ -58,16 +97,33 @@ export async function handleDatabaseRequest(request, env, corsHeaders) {
             }
 
             // ===== LIMIT / OFFSET =====
-            if (limit) {
-                if (page === -1) {
+            if (parsedLimit) {
+                if (isRandomPage) {
                     // random + limit
-                    sql += ` LIMIT ${parseInt(limit)}`;
-                } else if (page) {
-                    sql += ` LIMIT ${parseInt(limit)} OFFSET ${(parseInt(page) - 1) * parseInt(limit)}`;
+                    sql += ` LIMIT ${parsedLimit}`;
+                } else if (parsedPage) {
+                    sql += ` LIMIT ${parsedLimit} OFFSET ${(parsedPage - 1) * parsedLimit}`;
                 }
             }
 
-            const rs = await env.DB.prepare(sql).bind(...values).all();
+            const rs = await env.DB.prepare(sql).bind(...safeValues).all();
+
+            if (isTruthyFlag(with_total)) {
+                let countSql = `SELECT COUNT(*) as total FROM ${table}`;
+                if (filterKeys.length) {
+                    countSql += ' WHERE ' + filterKeys.map(k => `${k}=?`).join(' AND ');
+                }
+                const countRow = await env.DB.prepare(countSql).bind(...safeValues).first();
+                return new Response(
+                    JSON.stringify({
+                        items: rs.results,
+                        total: Number(countRow?.total || 0),
+                        page: parsedPage === -1 ? 1 : parsedPage,
+                        limit: parsedLimit || rs.results.length
+                    }),
+                    { headers: corsHeaders }
+                );
+            }
 
             return new Response(
                 JSON.stringify(rs.results),
