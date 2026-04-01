@@ -24,27 +24,37 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
-		if (path === "/list_song") {
-			const page = parseInt(url.searchParams.get("page") || "1");
-			const limit = parseInt(url.searchParams.get("limit") || "20");
-			const offset = (page - 1) * limit;
-			const lang = url.searchParams.get("lang");
-			const key = url.searchParams.get("key");
-			const value = url.searchParams.get("value");
-			const fields = "id, name, artist, album, genre, lang, link_ytb, mp3, avatar, year, date";
-			let query = `SELECT ${fields} FROM song`;
-			const params = [];
-			const conditions = [];
-			if (lang) {
-				conditions.push("lang = ?");
-				params.push(lang);
-			}
-			if (key && value) {
-				conditions.push(`${key} = ?`);
-				params.push(value);
-			}
-			if (conditions.length > 0) {
-				query += " WHERE " + conditions.join(" AND ");
+			if (path === "/list_song") {
+				const page = parseInt(url.searchParams.get("page") || "1");
+				const limit = parseInt(url.searchParams.get("limit") || "20");
+				const offset = (page - 1) * limit;
+				const lang = url.searchParams.get("lang");
+				const key = (url.searchParams.get("key") || "").trim();
+				const value = (url.searchParams.get("value") || "").trim();
+				const fields = "id, name, artist, album, genre, lang, link_ytb, mp3, avatar, year, date";
+				const allowFields = ["artist", "album", "genre", "year", "lang", "id", "name"];
+				let query = `SELECT ${fields} FROM song`;
+				const params = [];
+				const conditions = [];
+				if (lang) {
+					conditions.push("lang = ?");
+					params.push(lang);
+				}
+				if (key && value) {
+					if (!allowFields.includes(key)) {
+						return Response.json({ error: "Invalid key" }, { status: 400, headers: corsHeaders });
+					}
+
+					if (["artist", "album", "genre", "name", "lang"].includes(key)) {
+						conditions.push(`LOWER(${key}) = ?`);
+						params.push(value.toLowerCase());
+					} else {
+						conditions.push(`${key} = ?`);
+						params.push(value);
+					}
+				}
+				if (conditions.length > 0) {
+					query += " WHERE " + conditions.join(" AND ");
 			}
 			if (page === 0) {
 				query += " ORDER BY RANDOM()";
