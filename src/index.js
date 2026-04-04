@@ -7,6 +7,7 @@ import { handleReportsRequest } from './reports.js';
 import { handleLogRequest } from './log.js';
 import { handleTopPlayerRequest } from './top_player.js';
 import { handleDatabaseRequest } from './database.js';
+import { handleSeoLinkRequest } from './seo_link.js';
 
 export default {
 	async fetch(request, env) {
@@ -96,6 +97,11 @@ export default {
 			case pathname === '/update_table':
 			case pathname === '/search_table':
 				return handleDatabaseRequest(request, env, corsHeaders);
+
+			case pathname === '/list_seo_link':
+			case pathname === '/upsert_seo_link':
+			case pathname === '/delete_seo_link':
+				return handleSeoLinkRequest(request, env, corsHeaders);
 			default:
 				return new Response(
 					JSON.stringify({ message: 'Worker is running but route not found', path: pathname }),
