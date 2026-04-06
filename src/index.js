@@ -100,6 +100,7 @@ export default {
 
 			case pathname === '/list_seo_link':
 			case pathname === '/upsert_seo_link':
+			case pathname === '/set_seo_link_status':
 			case pathname === '/delete_seo_link':
 				return handleSeoLinkRequest(request, env, corsHeaders);
 			default:

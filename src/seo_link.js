@@ -11,6 +11,12 @@ function normalizeSeoLink(url) {
 	}
 }
 
+function normalizeSeoStatus(status) {
+	const raw = String(status || '').trim().toLowerCase();
+	if (raw === 'awaiting_confirmation') return 'awaiting_confirmation';
+	return 'live';
+}
+
 export async function handleSeoLinkRequest(request, env, corsHeaders) {
 	const url = new URL(request.url);
 	const path = url.pathname;
@@ -19,33 +25,58 @@ export async function handleSeoLinkRequest(request, env, corsHeaders) {
 	try {
 		if (path === '/list_seo_link' && method === 'GET') {
 			const limit = Math.max(1, Math.min(parseInt(url.searchParams.get('limit') || '10000', 10) || 10000, 50000));
-			const { results } = await env.DB
-				.prepare('SELECT url, checked_at FROM seo_link ORDER BY checked_at DESC LIMIT ?')
-				.bind(limit)
-				.all();
+			let results = [];
+			try {
+				const rs = await env.DB
+					.prepare('SELECT url, status, checked_at FROM seo_link ORDER BY checked_at DESC LIMIT ?')
+					.bind(limit)
+					.all();
+				results = rs.results || [];
+			} catch (error) {
+				if (!String(error?.message || '').includes('no such column: status')) throw error;
+				const legacy = await env.DB
+					.prepare('SELECT url, checked_at FROM seo_link ORDER BY checked_at DESC LIMIT ?')
+					.bind(limit)
+					.all();
+				results = (legacy.results || []).map((item) => ({ ...item, status: 'live' }));
+			}
 
 			return Response.json(results || [], { headers: corsHeaders });
 		}
 
-		if (path === '/upsert_seo_link' && method === 'POST') {
+		if ((path === '/upsert_seo_link' || path === '/set_seo_link_status') && method === 'POST') {
 			const body = await request.json();
 			const normalizedUrl = normalizeSeoLink(body?.url);
+			const status = String(body?.status || '').trim().toLowerCase();
 
 			if (!normalizedUrl) {
 				return Response.json({ error: 'Missing url' }, { status: 400, headers: corsHeaders });
 			}
 
+			if (status === 'need_check') {
+				const deleted = await env.DB
+					.prepare('DELETE FROM seo_link WHERE url = ?')
+					.bind(normalizedUrl)
+					.run();
+
+				return Response.json(
+					{ success: true, url: normalizedUrl, status: 'need_check', changes: deleted?.changes || 0 },
+					{ headers: corsHeaders }
+				);
+			}
+
+			const normalizedStatus = normalizeSeoStatus(status);
 			await env.DB
 				.prepare(`
-					INSERT INTO seo_link (url, checked_at)
-					VALUES (?, CURRENT_TIMESTAMP)
-					ON CONFLICT(url) DO UPDATE SET checked_at = CURRENT_TIMESTAMP
+					INSERT INTO seo_link (url, status, checked_at)
+					VALUES (?, ?, CURRENT_TIMESTAMP)
+					ON CONFLICT(url) DO UPDATE SET status = excluded.status, checked_at = CURRENT_TIMESTAMP
 				`)
-				.bind(normalizedUrl)
+				.bind(normalizedUrl, normalizedStatus)
 				.run();
 
 			return Response.json(
-				{ success: true, url: normalizedUrl, is_live: true },
+				{ success: true, url: normalizedUrl, status: normalizedStatus },
 				{ headers: corsHeaders }
 			);
 		}
@@ -74,6 +105,13 @@ export async function handleSeoLinkRequest(request, env, corsHeaders) {
 			headers: corsHeaders,
 		});
 	} catch (error) {
+		if (String(error?.message || '').includes('no such column: status')) {
+			return new Response(JSON.stringify({ error: 'Missing seo_link.status column. Please run API-DB-Workers/sql/seo_link_upgrade.sql first.' }), {
+				status: 500,
+				headers: corsHeaders,
+			});
+		}
+
 		return new Response(JSON.stringify({ error: error.message }), {
 			status: 500,
 			headers: corsHeaders,
