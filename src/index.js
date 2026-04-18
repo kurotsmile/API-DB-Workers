@@ -8,6 +8,7 @@ import { handleLogRequest } from './log.js';
 import { handleTopPlayerRequest } from './top_player.js';
 import { handleDatabaseRequest } from './database.js';
 import { handleSeoLinkRequest } from './seo_link.js';
+import { handleYoutubeRequest } from './youtube.js';
 
 export default {
 	async fetch(request, env) {
@@ -103,6 +104,9 @@ export default {
 			case pathname === '/set_seo_link_status':
 			case pathname === '/delete_seo_link':
 				return handleSeoLinkRequest(request, env, corsHeaders);
+
+			case pathname === '/youtube_info' && request.method === 'GET':
+				return handleYoutubeRequest(request, env, corsHeaders);
 			default:
 				return new Response(
 					JSON.stringify({ message: 'Worker is running but route not found', path: pathname }),
