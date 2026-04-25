@@ -1,6 +1,7 @@
 export async function handleSongRequest(request, env, corsHeaders) {
 	const url = new URL(request.url);
 	const path = url.pathname;
+	const songFields = 'id, name, artist, album, genre, lang, year, date, publishedAt, link_ytb, mp3, avatar, lyrics, created_at, sync_status';
 
 	try {
 
@@ -15,7 +16,7 @@ export async function handleSongRequest(request, env, corsHeaders) {
 		if (path === '/get_song') {
 			const id = url.searchParams.get('id');
 			if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400, headers: corsHeaders });
-			const { results } = await env.DB.prepare('SELECT * FROM song WHERE id = ? LIMIT 1').bind(id).all();
+			const { results } = await env.DB.prepare(`SELECT ${songFields} FROM song WHERE id = ? LIMIT 1`).bind(id).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
 
@@ -31,9 +32,10 @@ export async function handleSongRequest(request, env, corsHeaders) {
 				const lang = url.searchParams.get("lang");
 				const key = (url.searchParams.get("key") || "").trim();
 				const value = (url.searchParams.get("value") || "").trim();
-				const fields = "id, name, artist, album, genre, lang, link_ytb, mp3, avatar, year, date";
+				const orderKey = getSongOrderKey(url.searchParams.get("order_key") || "publishedAt");
+				const orderType = getOrderType(url.searchParams.get("order_type") || "DESC");
 				const allowFields = ["artist", "album", "genre", "year", "lang", "id", "name"];
-				let query = `SELECT ${fields} FROM song`;
+				let query = `SELECT ${songFields} FROM song`;
 				const params = [];
 				const conditions = [];
 				if (lang) {
@@ -59,7 +61,7 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			if (page === 0) {
 				query += " ORDER BY RANDOM()";
 			} else {
-				query += " ORDER BY date DESC";
+				query += ` ORDER BY ${orderKey} ${orderType}`;
 			}
 			if (limit !== -1) {
 				query += " LIMIT ? OFFSET ?";
@@ -102,9 +104,11 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			const offset = (page - 1) * limit;
 			const userId = url.searchParams.get('userId') || '';
 			const log = url.searchParams.get('log') || '1';
+			const orderKey = getSongOrderKey(url.searchParams.get('order_key') || 'publishedAt');
+			const orderType = getOrderType(url.searchParams.get('order_type') || 'DESC');
 
 			let query = `
-				SELECT id, name, artist, album, genre, lang, link_ytb, mp3, avatar 
+				SELECT ${songFields}
 				FROM song
 			`;
 			const params = [];
@@ -120,7 +124,7 @@ export async function handleSongRequest(request, env, corsHeaders) {
 			}
 
 			if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
-			query += ' ORDER BY date DESC LIMIT ? OFFSET ?';
+			query += ` ORDER BY ${orderKey} ${orderType} LIMIT ? OFFSET ?`;
 			params.push(limit, offset);
 
 			const { results } = await env.DB.prepare(query).bind(...params).all();
@@ -278,5 +282,31 @@ export async function handleSongRequest(request, env, corsHeaders) {
 		return new Response(JSON.stringify({ error: 'Unknown song route' }), { status: 404, headers: corsHeaders });
 	} catch (err) {
 		return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+	}
+}
+
+function getOrderType(rawValue) {
+	return String(rawValue || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+}
+
+function getSongOrderKey(rawValue) {
+	switch (String(rawValue || '').trim()) {
+		case 'name':
+			return 'name COLLATE NOCASE';
+		case 'artist':
+			return 'artist COLLATE NOCASE';
+		case 'album':
+			return 'album COLLATE NOCASE';
+		case 'genre':
+			return 'genre COLLATE NOCASE';
+		case 'year':
+			return 'year';
+		case 'date':
+			return "COALESCE(NULLIF(date, ''), created_at)";
+		case 'created_at':
+			return 'created_at';
+		case 'publishedAt':
+		default:
+			return "COALESCE(NULLIF(publishedAt, ''), NULLIF(date, ''), created_at)";
 	}
 }
