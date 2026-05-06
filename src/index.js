@@ -46,6 +46,7 @@ export default {
 			case pathname === '/get_user':
 			case pathname === '/search_user':
 			case pathname === '/login':
+			case pathname === '/oauth_login':
 			case pathname === '/register':
 			case pathname === '/get_password':
 			case pathname === '/update_user':

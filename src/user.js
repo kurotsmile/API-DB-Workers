@@ -64,6 +64,55 @@ export async function handleUserRequest(request, env, corsHeaders) {
 			return new Response(JSON.stringify({ success: true, user }), { headers: corsHeaders });
 		}
 
+		if (path === "/oauth_login" && request.method === "POST") {
+			let body = {};
+			const contentType = request.headers.get("content-type") || "";
+			if (contentType.includes("application/json")) {
+				body = await request.json();
+			} else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+				const formData = await request.formData();
+				body = Object.fromEntries(formData);
+			}
+
+			const email = String(body.email || '').trim().toLowerCase();
+			const name = String(body.name || '').trim();
+			const avatar = String(body.avatar || '').trim();
+			const provider = String(body.provider || 'google').trim().toLowerCase();
+			const lang = String(body.lang || 'en').trim().toLowerCase();
+
+			if (!email) {
+				return new Response(JSON.stringify({ error: 'Missing email' }), { status: 400, headers: corsHeaders });
+			}
+
+			const existing = await env.DB.prepare('SELECT id, name, email, avatar, address, phone, sex, type, role, birthday, lang FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1').bind(email).all();
+			if (existing.results.length > 0) {
+				const currentUser = existing.results[0];
+				const nextName = name || currentUser.name || email.split('@')[0];
+				const nextAvatar = avatar || currentUser.avatar || '';
+				const nextType = currentUser.type || provider;
+				const nextLang = currentUser.lang || lang || 'en';
+
+				await env.DB.prepare('UPDATE users SET name = ?, avatar = ?, type = ?, lang = ? WHERE id = ?')
+					.bind(nextName, nextAvatar, nextType, nextLang, currentUser.id)
+					.run();
+
+				const { results } = await env.DB.prepare('SELECT id, name, email, avatar, address, phone, sex, type, role, birthday, lang FROM users WHERE id = ? LIMIT 1').bind(currentUser.id).all();
+				return new Response(JSON.stringify({ success: true, user: results[0] }), { headers: corsHeaders });
+			}
+
+			const createdAt = new Date().toISOString();
+			const password = `oauth:${provider}:${crypto.randomUUID()}`;
+			const displayName = name || email.split('@')[0];
+
+			await env.DB.prepare(`
+				INSERT INTO users (name, email, password, avatar, phone, sex, lang, created_at, role, type)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`).bind(displayName, email, password, avatar, '', '', lang || 'en', createdAt, 'user', provider).run();
+
+			const { results } = await env.DB.prepare('SELECT id, name, email, avatar, address, phone, sex, type, role, birthday, lang FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1').bind(email).all();
+			return new Response(JSON.stringify({ success: true, user: results[0] }), { headers: corsHeaders });
+		}
+
 		if (path === '/get_password' && request.method === 'POST') {
 			const body = await request.json();
 			const { email } = body;
